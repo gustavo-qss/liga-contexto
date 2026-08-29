@@ -688,7 +688,10 @@ createApp({
       // no build publicado o trabalho da aula viaja como semente: quem ja tinha
       // resposta salva no servidor da sala volta exatamente onde parou.
       if (estatico) {
-        return doNavegador(chave) ?? structuredClone(window.SEMENTES?.[chave] ?? null);
+        const semente = window.SEMENTES && window.SEMENTES[chave];
+        // copia antes de entregar: a semente e lida uma vez e nao pode ser
+        // alterada pelo que o aluno digitar depois
+        return doNavegador(chave) ?? (semente ? JSON.parse(JSON.stringify(semente)) : null);
       }
       try {
         const r = await fetch(`/api/estado/${matricula}`);
