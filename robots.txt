@@ -1,0 +1,3 @@
+# Material de aula com lista de turma: nao e conteudo de busca.
+User-agent: *
+Disallow: /

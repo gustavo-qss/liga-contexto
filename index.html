@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<title>Engenharia de contexto — liga-api</title>
+<style>
+  /* ---------------------------------------------------------------
+     Sistema: preto sobre branco. Cinzas quentes, sem cor nenhuma.
+     Escala de espaco em multiplos de 4px.
+     --------------------------------------------------------------- */
+  :root {
+    --tinta:      #111110;
+    --tinta-70:   #4a4a46;
+    --fraco:      #77756e;
+    --regua:      #ccc9c2;
+    --regua-fina: #e6e3dc;
+    --realce:     #f6f5f1;
+    --realce-2:   #efeee9;
+    --papel:      #ffffff;
+
+    --serif: "Iowan Old Style", Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    --e1: 4px;  --e2: 8px;  --e3: 12px; --e4: 16px;
+    --e5: 24px; --e6: 32px; --e7: 48px; --e8: 64px;
+
+    --coluna: 1160px;
+    --leitura: 660px;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+
+  body {
+    margin: 0;
+    background: var(--papel);
+    color: var(--tinta);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.62;
+    font-kerning: normal;
+    text-rendering: optimizeLegibility;
+    scrollbar-width: thin;
+    scrollbar-color: var(--regua) transparent;
+  }
+  ::selection { background: var(--tinta); color: var(--papel); }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+  /* campos ja sinalizam foco pela borda; o anel duplo pesa */
+  input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
+  input[type=text]:focus, textarea:focus, select:focus { border-color: var(--tinta); box-shadow: inset 0 0 0 1px var(--tinta); }
+  code { font-family: var(--mono); font-size: .88em; }
+
+  /* ---- estrutura ---- */
+  .folha { width: 100%; max-width: var(--coluna); margin-inline: auto; padding: 0 var(--e6) var(--e8); }
+  .estreita { max-width: var(--leitura); margin-inline: auto; }
+  .centrada { display: flex; flex-direction: column; justify-content: center; min-height: 62vh; }
+  @media (max-width: 640px) { .folha { padding-inline: var(--e4); } .centrada { min-height: 0; } }
+
+  header.cabeca {
+    border-bottom: 3px double var(--tinta);
+    margin-bottom: var(--e7);
+    padding: var(--e5) 0 var(--e3);
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--e4); flex-wrap: wrap;
+  }
+  .marca { font-variant: small-caps; letter-spacing: .1em; font-size: 15px; }
+  .marca b { font-weight: 600; }
+  .marca i { font-style: normal; color: var(--fraco); }
+  .identificacao {
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.7;
+    color: var(--tinta-70); text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .estado-conexao { color: var(--fraco); }
+  .estado-conexao::before {
+    content: ""; display: inline-block; width: 6px; height: 6px;
+    background: currentColor; border-radius: 50%; margin-right: 6px; vertical-align: 1px;
+  }
+  .estado-conexao.local::before { background: transparent; box-shadow: inset 0 0 0 1px currentColor; }
+
+  /* ---- tipografia ---- */
+  h1 {
+    font-size: clamp(27px, 3.4vw, 35px); line-height: 1.15; font-weight: 500;
+    margin: 0 0 var(--e2); letter-spacing: -.015em; text-wrap: balance;
+  }
+  h2 { font-size: 20px; font-weight: 600; margin: var(--e6) 0 var(--e3); letter-spacing: -.005em; }
+  h3 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
+  p { margin: 0 0 var(--e4); text-wrap: pretty; }
+  .subtitulo { color: var(--tinta-70); font-size: 17px; margin: 0 0 var(--e6); text-wrap: pretty; }
+  .numero-secao {
+    display: block; font-family: var(--mono); font-size: 11px; letter-spacing: .16em;
+    color: var(--fraco); margin-bottom: var(--e2);
+  }
+  .miudo { font-size: 13.5px; line-height: 1.5; color: var(--fraco); }
+  ul.limpa { padding-left: var(--e4); margin: 0 0 var(--e4); }
+  ul.limpa li { margin-bottom: var(--e2); padding-left: var(--e1); text-wrap: pretty; }
+  ul.limpa li::marker { color: var(--regua); }
+
+  /* ---- formulario ---- */
+  label.campo { display: block; margin-bottom: var(--e4); }
+  label.campo > span {
+    display: block; font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--fraco); margin-bottom: var(--e2);
+  }
+  input[type=text], textarea, select {
+    width: 100%; padding: 10px var(--e3); background: var(--papel);
+    border: 1px solid var(--regua); border-radius: 0;
+    transition: border-color .12s ease;
+  }
+  input[type=text] { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+  input[type=text]:hover, textarea:hover, select:hover { border-color: var(--tinta-70); }
+  input[type=text]:focus, textarea:focus, select:focus { border-color: var(--tinta); }
+  textarea { min-height: 84px; resize: vertical; font-family: var(--serif); font-size: 15.5px; line-height: 1.5; }
+  select { appearance: none; background-image: linear-gradient(45deg, transparent 49%, var(--tinta) 50%);
+    background-size: 7px 7px; background-position: right 14px center; background-repeat: no-repeat; padding-right: var(--e6); }
+
+  button {
+    background: var(--tinta); color: var(--papel); border: 1px solid var(--tinta);
+    padding: 10px var(--e5); cursor: pointer; letter-spacing: .015em;
+    transition: background .12s ease, color .12s ease, opacity .12s ease;
+  }
+  button:hover:not(:disabled) { background: var(--tinta-70); border-color: var(--tinta-70); }
+  button.vazado { background: var(--papel); color: var(--tinta); }
+  button.vazado:hover:not(:disabled) { background: var(--realce); color: var(--tinta); border-color: var(--tinta); }
+  button:disabled { opacity: .3; cursor: not-allowed; }
+  .acoes { display: flex; gap: var(--e3); flex-wrap: wrap; }
+
+  .aviso {
+    border: 1px solid var(--regua); border-left: 3px solid var(--tinta);
+    padding: var(--e3) var(--e4); margin-bottom: var(--e5); font-size: 15px; background: var(--realce);
+  }
+  .aviso b { font-weight: 600; }
+  .erro { border-left-style: double; border-left-width: 4px; }
+
+  /* ---- trilha de etapas ---- */
+  .trilha-suporte {
+    position: sticky; top: 0; z-index: 5; background: var(--papel);
+    padding: var(--e3) 0 var(--e4); margin-bottom: var(--e5);
+    box-shadow: 0 1px 0 var(--regua-fina);
+  }
+  .trilha { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--tinta); }
+  .trilha div {
+    padding: 9px var(--e3); font-size: 13.5px; text-align: center;
+    border-right: 1px solid var(--regua-fina); color: var(--fraco);
+    transition: background .12s ease, color .12s ease; user-select: none;
+  }
+  .trilha div:last-child { border-right: 0; }
+  .trilha div.liberada:hover { background: var(--realce); color: var(--tinta); }
+  .trilha div.feita { color: var(--tinta); }
+  .trilha div.feita::before { content: "✓"; font-family: var(--mono); font-size: 11px; margin-right: 6px; }
+  .trilha div.ativa { background: var(--tinta); color: var(--papel); }
+
+  /* ---- bancada ---- */
+  .bancada { display: grid; grid-template-columns: minmax(0, 1fr) 384px; gap: var(--e7); align-items: start; }
+  @media (max-width: 1000px) { .bancada { grid-template-columns: minmax(0, 1fr); gap: var(--e5); } }
+
+  .documento { border-top: 2px solid var(--tinta); }
+  .documento-rodape {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .1em; color: var(--fraco);
+    padding-top: var(--e3); text-align: right;
+  }
+
+  .trecho {
+    display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: var(--e3);
+    padding: var(--e4) var(--e4) var(--e4) 0;
+    border-bottom: 1px solid var(--regua-fina);
+    cursor: pointer; position: relative; scroll-margin-top: 96px;
+    transition: background .12s ease;
+  }
+  .trecho::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: -1px; width: 3px;
+    background: transparent; transition: background .12s ease;
+  }
+  .trecho:hover { background: var(--realce); }
+  .trecho.selecionado { background: var(--realce); }
+  .trecho.selecionado::before { background: var(--tinta); }
+  .trecho .indice {
+    font-family: var(--mono); font-size: 11px; color: var(--fraco);
+    padding-top: 4px; text-align: right; font-variant-numeric: tabular-nums;
+    padding-left: var(--e3);
+  }
+  .trecho .corpo { overflow-wrap: break-word; transition: opacity .12s ease; }
+  .trecho .corpo.prosa p { margin: 0 0 var(--e2); }
+  .trecho .corpo.prosa p:last-child { margin-bottom: 0; }
+  .trecho .corpo.codigo {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.55;
+    background: var(--realce-2); padding: var(--e3); margin: 2px 0;
+    overflow-x: auto; white-space: pre; scrollbar-width: thin;
+  }
+  .trecho.selecionado .corpo.codigo { background: var(--papel); }
+
+  .trecho.mantido::before { background: var(--tinta); }
+  .trecho.reescrito::before {
+    background: repeating-linear-gradient(180deg, var(--tinta-70) 0 9px, transparent 9px 15px);
+  }
+  .trecho.cortado::before { background: var(--regua); }
+  .trecho.cortado .corpo { opacity: .34; text-decoration: line-through; text-decoration-thickness: 1px; }
+
+  .marca-veredito {
+    display: block; margin-top: 5px; font-family: var(--mono);
+    font-size: 13px; line-height: 1; color: var(--tinta);
+  }
+  .legenda {
+    display: flex; gap: var(--e5); flex-wrap: wrap; justify-content: flex-end;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em;
+    color: var(--fraco); padding-bottom: var(--e2);
+  }
+  .legenda span b { font-weight: 400; color: var(--tinta); margin-right: 5px; }
+
+  /* trecho longo: colapsa para o documento nao virar um rolo */
+  .trecho .corpo.colapsado {
+    max-height: 190px; overflow: hidden;
+    -webkit-mask-image: linear-gradient(180deg, #000 118px, transparent);
+            mask-image: linear-gradient(180deg, #000 118px, transparent);
+  }
+  .abrir {
+    grid-column: 2; justify-self: start; margin-top: var(--e2);
+    background: none; border: 0; padding: 0; color: var(--tinta-70);
+    font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .abrir:hover { background: none; color: var(--tinta); }
+
+  /* ---- painel lateral ---- */
+  aside { position: sticky; top: 84px; }
+  @media (max-width: 1000px) { aside { position: static; } }
+  .painel {
+    border: 1px solid var(--regua); border-top: 3px solid var(--tinta);
+    padding: var(--e5); background: var(--papel);
+    max-height: calc(100vh - 108px); overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .painel + .painel { margin-top: var(--e4); max-height: none; }
+  .guia { border: 1px solid var(--regua-fina); border-left: 2px solid var(--tinta);
+    padding: var(--e4) var(--e5); margin-top: var(--e4); background: var(--realce); }
+  .guia h4 { margin: 0 0 var(--e3); font-family: var(--mono); font-size: 10.5px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--fraco); font-weight: 400; }
+  .guia ol { margin: 0; padding-left: var(--e4); font-size: 14px; }
+  .guia li { margin-bottom: var(--e2); text-wrap: pretty; }
+  .guia li:last-child { margin-bottom: 0; }
+  .guia p { margin: var(--e3) 0 0; font-size: 13px; color: var(--fraco); }
+  .painel-cabeca { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e3); margin-bottom: var(--e1); }
+  .painel-cabeca .ordinal { font-family: var(--mono); font-size: 11px; color: var(--fraco); font-variant-numeric: tabular-nums; }
+  .painel .vazio { color: var(--fraco); font-size: 14.5px; margin: var(--e2) 0 0; }
+
+  .vereditos { display: grid; grid-template-columns: repeat(3, 1fr); margin: var(--e4) 0 var(--e5); }
+  .vereditos button {
+    background: var(--papel); color: var(--tinta-70); border: 1px solid var(--regua);
+    border-right-width: 0; padding: 9px var(--e1); font-size: 11.5px;
+    font-family: var(--mono); letter-spacing: .08em;
+  }
+  .vereditos button:last-child { border-right-width: 1px; }
+  .vereditos button:hover:not(.ativo) { background: var(--realce); color: var(--tinta); }
+  .vereditos button.ativo { background: var(--tinta); border-color: var(--tinta); color: var(--papel); }
+
+  .medidor { margin-top: var(--e5); border-top: 1px solid var(--regua-fina); padding-top: var(--e3); }
+  .medidor .linha { display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--mono); font-size: 11px; color: var(--fraco); font-variant-numeric: tabular-nums; }
+  .medidor .trilho { height: 2px; background: var(--regua-fina); margin-top: var(--e2); }
+  .medidor .preenchido { height: 2px; background: var(--tinta); transition: width .2s ease; }
+
+  /* ---- acrescimos ---- */
+  .adicoes { margin-top: var(--e6); border-top: 2px solid var(--tinta); padding-top: var(--e4); }
+  .adicao { border: 1px solid var(--regua-fina); border-left: 2px solid var(--regua); padding: var(--e4); margin-bottom: var(--e3); }
+  .adicao .cima { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--e3); }
+  .adicao .cima span { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; color: var(--fraco); }
+  .remover { background: none; border: 0; color: var(--fraco); padding: 0; font-size: 12px;
+    text-decoration: underline; text-underline-offset: 3px; }
+  .remover:hover { background: none; color: var(--tinta); }
+
+  /* ---- barra final ---- */
+  .barra-fim {
+    position: sticky; bottom: 0; z-index: 4; background: var(--papel);
+    border-top: 2px solid var(--tinta); margin-top: var(--e6);
+    padding: var(--e3) 0 var(--e4);
+    display: flex; justify-content: space-between; align-items: center; gap: var(--e4); flex-wrap: wrap;
+    box-shadow: 0 -10px 14px -10px rgba(0,0,0,.14);
+  }
+  /* no fechamento a barra e conteudo comum, nao rodape fixo */
+  .barra-fim.estatica { position: static; }
+
+  /* ---- fechamento ---- */
+  table.resumo { width: 100%; border-collapse: collapse; margin: var(--e4) 0 var(--e6); font-size: 15px; }
+  table.resumo th, table.resumo td { text-align: left; padding: 9px var(--e2); border-bottom: 1px solid var(--regua-fina); }
+  table.resumo th { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--fraco); font-weight: 400; border-bottom: 1px solid var(--tinta); }
+  table.resumo td:not(:first-child) { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+  table.resumo tr:last-child td { border-bottom: 0; }
+</style>
+</head>
+<body>
+<div id="app" class="folha">
+
+  <header class="cabeca">
+    <div class="marca"><b>Engenharia de contexto</b> <i>— liga-api</i></div>
+    <div class="identificacao" v-if="aluno">
+      {{ aluno.nome }}<span v-if="dupla"> &amp; {{ dupla.nome }}</span> · matrícula {{ estado.matricula }} · variante {{ variante }}
+      <br><span class="estado-conexao" :class="{ local: !online }">{{ ONDE_SALVA }}</span>
+    </div>
+  </header>
+
+  <!-- 1. identificacao -->
+  <section v-if="tela === 'entrada'" class="estreita centrada">
+    <span class="numero-secao">ETAPA 0</span>
+    <h1>Identificação</h1>
+    <p class="subtitulo">Informe a matrícula para receber a sua variante do material.</p>
+
+    <label class="campo">
+      <span>Matrícula</span>
+      <input type="text" v-model.trim="entradaMatricula" @keyup.enter="procurar" inputmode="numeric" autofocus>
+    </label>
+    <div v-if="erroEntrada" class="aviso erro">{{ erroEntrada }}</div>
+
+    <div v-if="candidato">
+      <div class="aviso">Você é <b>{{ candidato.nome }}</b>?</div>
+      <label class="campo">
+        <span>Matrícula da dupla (opcional)</span>
+        <input type="text" v-model.trim="entradaDupla" inputmode="numeric">
+      </label>
+      <div class="acoes">
+        <button @click="confirmar">Sim, sou eu</button>
+        <button class="vazado" @click="candidato = null; entradaDupla = ''">Não</button>
+      </div>
+    </div>
+    <button v-else @click="procurar">Procurar</button>
+  </section>
+
+  <!-- 2. briefing -->
+  <section v-else-if="tela === 'briefing'" class="estreita">
+    <span class="numero-secao">CONTEXTO</span>
+    <h1>O projeto: liga-api</h1>
+    <p class="subtitulo">Leia antes de começar. Sem isso não dá para julgar o que é supérfluo.</p>
+
+    <p>A <b>liga-api</b> é uma API de campeonato de e-sports escrita em Node puro, <b>sem nenhuma
+    dependência externa</b>. Ela roda com <code>npm run dev</code> e é verificada com
+    <code>npm test</code>, usando o test runner nativo do Node.</p>
+
+    <p>Hoje existem dois recursos prontos e testados: <b>times</b> e <b>partidas</b>. Cada recurso
+    tem quatro arquivos — rotas, controlador, serviço e repositório — e os dados vivem em memória,
+    somem quando o servidor reinicia.</p>
+
+    <p>O que <b>ainda não existe</b> é a <b>classificação</b>: a tabela do campeonato. É essa a
+    tarefa descrita nos três artefatos que você vai receber.</p>
+
+    <h2>O que o campeonato exige</h2>
+    <ul class="limpa">
+      <li>A tabela sai das partidas. Ninguém guarda tabela pronta.</li>
+      <li>Empate se resolve em cascata: pontos, depois saldo de rounds, depois confronto direto, depois o id do time.</li>
+      <li>Partida cancelada não conta. Partida por W.O. vale vitória com saldo fixo de 2×0, não o placar registrado.</li>
+      <li>Time removido sai da tabela, mas as partidas dele permanecem no histórico.</li>
+    </ul>
+
+    <h2>O que você vai fazer</h2>
+    <p>Três artefatos, um de cada vez: o <b>prompt</b> da tarefa, o <b>AGENTS.md</b> do projeto e uma
+    <b>skill</b>. Todos estão inchados. Em cada trecho você decide <b>cortar</b>, <b>manter</b> ou
+    <b>reescrever</b> — e justifica. Depois acrescenta o que estava faltando.</p>
+    <p class="miudo">Cuidado: nem tudo que parece enfeite é enfeite. Cortar a linha errada estraga o projeto.</p>
+
+    <div class="barra-fim estatica">
+      <span class="miudo">Mínimo por etapa: {{ MIN_VEREDITOS }} vereditos e {{ MIN_ADICOES }} acréscimo.</span>
+      <button @click="tela = 'etapa'">Começar pelo prompt</button>
+    </div>
+  </section>
+
+  <!-- 3. etapas -->
+  <section v-else-if="tela === 'etapa'">
+    <div class="trilha-suporte">
+      <div class="trilha">
+        <div v-for="(rotulo, chave) in ROTULOS" :key="chave"
+             :class="{ ativa: etapaAtual === chave, feita: estado.etapas[chave].concluida, liberada: liberada(chave) }"
+             @click="irPara(chave)"
+             :style="{ cursor: liberada(chave) ? 'pointer' : 'not-allowed' }">
+          {{ rotulo }}
+        </div>
+      </div>
+    </div>
+
+    <span class="numero-secao">ETAPA {{ indiceEtapa + 1 }} DE 3</span>
+    <h1>{{ TITULOS[etapaAtual] }}</h1>
+    <p class="subtitulo">{{ INSTRUCOES[etapaAtual] }}</p>
+
+    <div class="bancada">
+      <div>
+        <div class="legenda">
+          <span><b>×</b> cortado</span>
+          <span><b>●</b> mantido</span>
+          <span><b>✎</b> a reescrever</span>
+        </div>
+        <div class="documento">
+          <div v-for="trecho in trechos" :key="trecho.id"
+               class="trecho"
+               :class="[classeDoVeredito(trecho.id), { selecionado: trechoSelecionado === trecho.id }]"
+               @click="selecionar(trecho.id)">
+            <div class="indice">
+              {{ String(trecho.numero).padStart(2, '0') }}
+              <span class="marca-veredito" v-if="vereditos[trecho.id]?.veredito"
+                    :title="vereditos[trecho.id].veredito">{{ MARCAS[vereditos[trecho.id].veredito] }}</span>
+            </div>
+            <div v-if="pareceCodigo(trecho.texto)" class="corpo codigo"
+                 :class="{ colapsado: ehLongo(trecho.texto) && !expandidos[trecho.id] }">{{ trecho.texto }}</div>
+            <div v-else class="corpo prosa"
+                 :class="{ colapsado: ehLongo(trecho.texto) && !expandidos[trecho.id] }">
+              <p v-for="(par, i) in paragrafos(trecho.texto)" :key="i">{{ par }}</p>
+            </div>
+            <button v-if="ehLongo(trecho.texto)" class="abrir"
+                    @click.stop="expandidos[trecho.id] = !expandidos[trecho.id]">
+              {{ expandidos[trecho.id] ? 'recolher' : 'ver o trecho inteiro' }}
+            </button>
+
+          </div>
+          <div class="documento-rodape">{{ trechos.length }} trechos</div>
+        </div>
+
+        <div class="adicoes">
+          <h2 style="margin-top:0">O que faltava</h2>
+          <p class="miudo">Cortar não basta: o artefato precisa ganhar o que nunca teve.</p>
+
+          <div v-for="(adicao, i) in adicoes" :key="i" class="adicao">
+            <div class="cima">
+              <span class="miudo">Acréscimo {{ i + 1 }}</span>
+              <button class="remover" @click="adicoes.splice(i, 1)">remover</button>
+            </div>
+            <label class="campo">
+              <span>Linha que você acrescenta ao artefato</span>
+              <textarea v-model="adicao.texto"></textarea>
+            </label>
+            <label class="campo" style="margin-bottom:0">
+              <span>Por que isso mudaria o comportamento do agente</span>
+              <textarea v-model="adicao.justificativa"></textarea>
+            </label>
+          </div>
+          <button class="vazado" @click="adicoes.push({ texto: '', justificativa: '' })">+ acrescentar</button>
+        </div>
+      </div>
+
+      <aside>
+        <div class="painel">
+          <template v-if="trechoSelecionado">
+            <div class="painel-cabeca">
+              <h3>O que fazer com ele?</h3>
+              <span class="ordinal">trecho {{ String(numeroSelecionado).padStart(2, '0') }}</span>
+            </div>
+
+            <div class="vereditos">
+              <button v-for="v in ['CORTAR', 'MANTER', 'REESCREVER']" :key="v"
+                      :class="{ ativo: vereditoAtual.veredito === v }"
+                      @click="definirVeredito(v)">{{ v }}</button>
+            </div>
+
+            <label class="campo">
+              <span>Categoria</span>
+              <select v-model="vereditoAtual.categoria" @change="registrar">
+                <option value="">selecione…</option>
+                <option v-for="c in CATEGORIAS" :key="c" :value="c">{{ c }}</option>
+              </select>
+            </label>
+
+            <label class="campo" style="margin-bottom:0">
+              <span>Justificativa</span>
+              <textarea v-model="vereditoAtual.justificativa" @input="registrar"
+                        placeholder="Uma frase. Por que isso muda (ou não muda) o que o agente faz?"></textarea>
+            </label>
+
+            <div class="medidor">
+              <div class="linha">
+                <span>{{ totalVereditos }} de {{ MIN_VEREDITOS }} vereditos · {{ adicoesValidas }} de {{ MIN_ADICOES }} acréscimo</span>
+                <span>{{ Math.round(progressoEtapa * 100) }}%</span>
+              </div>
+              <div class="trilho"><div class="preenchido" :style="{ width: (progressoEtapa * 100) + '%' }"></div></div>
+            </div>
+          </template>
+          <template v-else>
+            <div class="painel-cabeca">
+              <h3>Nenhum trecho selecionado</h3>
+            </div>
+            <p class="vazio">Clique em um trecho à esquerda para julgá-lo.</p>
+            <div class="medidor">
+              <div class="linha">
+                <span>{{ totalVereditos }} de {{ MIN_VEREDITOS }} vereditos · {{ adicoesValidas }} de {{ MIN_ADICOES }} acréscimo</span>
+                <span>{{ Math.round(progressoEtapa * 100) }}%</span>
+              </div>
+              <div class="trilho"><div class="preenchido" :style="{ width: (progressoEtapa * 100) + '%' }"></div></div>
+            </div>
+          </template>
+        </div>
+
+        <div class="guia">
+          <h4>Para decidir</h4>
+          <ol>
+            <li>O agente descobriria isso sozinho lendo o código?</li>
+            <li>Se eu apagar, muda o que ele faz?</li>
+            <li>Dá para verificar se ele cumpriu?</li>
+          </ol>
+          <p>Sim, não e não — corte.</p>
+        </div>
+
+        <div v-if="etapaAtual === 'skill'" class="painel" style="margin-top:20px; position:static">
+          <h3>O gatilho da skill</h3>
+          <p class="miudo">O <code>description</code> é o que decide se a skill carrega. Reescreva:</p>
+          <textarea v-model="estado.gatilho" @input="agendarSalvamento"
+                    placeholder="description: use quando…"></textarea>
+        </div>
+      </aside>
+    </div>
+
+    <div class="barra-fim">
+      <span class="miudo" v-if="!podeConcluir">
+        Faltam {{ Math.max(0, MIN_VEREDITOS - totalVereditos) }} veredito(s)
+        e {{ Math.max(0, MIN_ADICOES - adicoesValidas) }} acréscimo(s) com justificativa.
+      </span>
+      <span class="miudo" v-else>Etapa completa.</span>
+      <button :disabled="!podeConcluir" @click="concluir">
+        {{ indiceEtapa < 2 ? 'Concluir e seguir' : 'Concluir e revisar' }}
+      </button>
+    </div>
+  </section>
+
+  <!-- 4. fechamento -->
+  <section v-else-if="tela === 'fim'" class="estreita centrada">
+    <span class="numero-secao">ENTREGA</span>
+    <h1>Feito.</h1>
+    <p class="subtitulo">Três artefatos revisados. Veja o que sobrou de cada um.</p>
+
+    <table class="resumo">
+      <tr><th>Artefato</th><th>Antes</th><th>Depois</th><th>Cortes</th><th>Acréscimos</th></tr>
+      <tr v-for="(rotulo, chave) in ROTULOS" :key="chave">
+        <td>{{ rotulo }}</td>
+        <td>{{ contagem(chave).antes }} trechos</td>
+        <td>{{ contagem(chave).depois }} trechos</td>
+        <td>{{ contagem(chave).cortes }}</td>
+        <td>{{ contagem(chave).adicoes }}</td>
+      </tr>
+    </table>
+
+    <div v-if="online" class="aviso">Entrega registrada no servidor do professor.</div>
+    <div v-else-if="estatico" class="aviso">
+      O trabalho fica guardado neste navegador. Baixe o arquivo e entregue pelo Classroom.
+    </div>
+    <div v-else class="aviso erro">
+      Sem servidor: baixe o arquivo abaixo e entregue pelo Classroom.
+    </div>
+    <div class="acoes">
+      <button @click="baixar">Baixar entrega-{{ estado.matricula }}.md</button>
+      <button class="vazado" @click="tela = 'etapa'">Voltar e revisar</button>
+    </div>
+  </section>
+</div>
+
+<script src="vue.global.prod.js"></script>
+<script src="dados/dados.js"></script>
+<script src="dados/sementes.js"></script>
+<script>
+const { createApp, reactive, ref, computed, watch } = Vue;
+
+const MIN_VEREDITOS = 5;
+const MIN_ADICOES = 1;
+const ETAPAS = ['prompt', 'agents', 'skill'];
+
+// a chave e um resumo da matricula (FNV-1a). o site publicado carrega so a chave,
+// entao o numero da matricula nunca aparece no repositorio nem no que o Google le.
+// e obfuscacao, nao segredo: quem tiver a lista de matriculas refaz o resumo.
+function chaveDe(matricula) {
+  const t = String(matricula).trim();
+  let h = 2166136261;
+  for (let i = 0; i < t.length; i += 1) {
+    h ^= t.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+// a variante vem da posicao do aluno na lista da turma: distribuicao exata,
+// vizinhos de chamada nunca caem na mesma, e reordenar o CSV muda quem pega o que.
+function variantePara(chave, turma) {
+  const i = turma.findIndex((a) => a.chave === chave);
+  return ((i < 0 ? 0 : i) % 10) + 1;
+}
+
+createApp({
+  setup() {
+    const dados = window.DADOS;
+    const tela = ref('entrada');
+    const entradaMatricula = ref('');
+    const entradaDupla = ref('');
+    const candidato = ref(null);
+    const erroEntrada = ref('');
+    const aluno = ref(null);
+    const dupla = ref(null);
+    const online = ref(false);
+    const etapaAtual = ref('prompt');
+    const trechoSelecionado = ref(null);
+    const expandidos = reactive({});   // trechos longos abertos pelo aluno
+
+    const estatico = dados.estatico === true;   // build do GitHub Pages: sem servidor
+    const estado = reactive({
+      chave: null, matricula: null, nome: null, dupla: null, variante: null, gatilho: '',
+      etapas: {
+        prompt: { vereditos: {}, adicoes: [], concluida: false },
+        agents: { vereditos: {}, adicoes: [], concluida: false },
+        skill:  { vereditos: {}, adicoes: [], concluida: false }
+      }
+    });
+
+    // o rotulo tem que acompanhar o estado real da conexao, nao o do primeiro render
+    const ONDE_SALVA = computed(() => estatico ? 'salvo neste navegador'
+      : online.value ? 'salvando no servidor' : 'modo local — exporte no fim');
+
+    const variante = computed(() => estado.variante);
+    const indiceEtapa = computed(() => ETAPAS.indexOf(etapaAtual.value));
+    const trechos = computed(() =>
+      estado.variante ? dados.variantes[estado.variante][etapaAtual.value].trechos : []);
+    const vereditos = computed(() => estado.etapas[etapaAtual.value].vereditos);
+    const adicoes = computed(() => estado.etapas[etapaAtual.value].adicoes);
+    const totalVereditos = computed(() => Object.values(vereditos.value)
+      .filter((v) => v.veredito && v.justificativa.trim()).length);
+    const adicoesValidas = computed(() => adicoes.value
+      .filter((a) => a.texto.trim() && a.justificativa.trim()).length);
+    const podeConcluir = computed(() =>
+      totalVereditos.value >= MIN_VEREDITOS && adicoesValidas.value >= MIN_ADICOES);
+    // quanto do minimo da etapa ja foi cumprido, para a barra do painel
+    const progressoEtapa = computed(() => {
+      const v = Math.min(totalVereditos.value, MIN_VEREDITOS) / MIN_VEREDITOS;
+      const a = Math.min(adicoesValidas.value, MIN_ADICOES) / MIN_ADICOES;
+      return (v + a) / 2;
+    });
+    const numeroSelecionado = computed(() =>
+      trechos.value.find((t) => t.id === trechoSelecionado.value)?.numero ?? 0);
+
+    const VAZIO = { veredito: '', categoria: '', justificativa: '' };
+    const vereditoAtual = computed(() =>
+      (trechoSelecionado.value && vereditos.value[trechoSelecionado.value]) || VAZIO);
+
+    // a entrada so nasce quando o aluno clica no trecho, nunca durante a leitura
+    function selecionar(id) {
+      if (!vereditos.value[id]) {
+        vereditos.value[id] = { veredito: '', categoria: '', justificativa: '' };
+      }
+      trechoSelecionado.value = id;
+    }
+
+    function procurar() {
+      erroEntrada.value = '';
+      const achado = dados.turma.find((a) => a.chave === chaveDe(entradaMatricula.value));
+      if (!achado) {
+        candidato.value = null;
+        erroEntrada.value = 'Matrícula não encontrada na lista da turma. Confira o número.';
+        return;
+      }
+      candidato.value = achado;
+    }
+
+    async function confirmar() {
+      aluno.value = candidato.value;
+      dupla.value = entradaDupla.value
+        ? dados.turma.find((a) => a.chave === chaveDe(entradaDupla.value)) ?? null
+        : null;
+      estado.chave = aluno.value.chave;
+      estado.matricula = entradaMatricula.value;
+      estado.nome = aluno.value.nome;
+      estado.dupla = dupla.value;
+      estado.variante = variantePara(aluno.value.chave, dados.turma);
+
+      const salvo = await carregar(estado.matricula, estado.chave);
+      if (salvo) {
+        // o que vem gravado manda, menos a identidade desta sessao
+        Object.assign(estado, salvo, { chave: estado.chave, matricula: estado.matricula });
+        if (estado.dupla) dupla.value = estado.dupla;
+        const pendente = ETAPAS.find((e) => !estado.etapas[e].concluida);
+        etapaAtual.value = pendente ?? 'skill';
+        tela.value = pendente ? 'etapa' : 'fim';
+        return;
+      }
+      tela.value = 'briefing';
+    }
+
+    function doNavegador(chave) {
+      const local = localStorage.getItem(`liga-${chave}`);
+      return local ? JSON.parse(local) : null;
+    }
+
+    async function carregar(matricula, chave) {
+      // no build publicado o trabalho da aula viaja como semente: quem ja tinha
+      // resposta salva no servidor da sala volta exatamente onde parou.
+      if (estatico) {
+        return doNavegador(chave) ?? structuredClone(window.SEMENTES?.[chave] ?? null);
+      }
+      try {
+        const r = await fetch(`/api/estado/${matricula}`);
+        online.value = true;
+        if (r.ok) return await r.json();
+        return null;
+      } catch {
+        online.value = false;
+        return doNavegador(chave);
+      }
+    }
+
+    let temporizador = null;
+    function agendarSalvamento() {
+      clearTimeout(temporizador);
+      temporizador = setTimeout(salvar, 700);
+    }
+
+    async function salvar() {
+      if (!estado.chave) return;
+      const bruto = JSON.parse(JSON.stringify(estado));
+      localStorage.setItem(`liga-${estado.chave}`, JSON.stringify(bruto));
+      if (estatico) return;
+      try {
+        const r = await fetch('/api/estado', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bruto)
+        });
+        online.value = r.ok;
+      } catch { online.value = false; }
+    }
+
+    watch(estado, agendarSalvamento, { deep: true });
+
+    function definirVeredito(v) { vereditoAtual.value.veredito = v; agendarSalvamento(); }
+    function registrar() { agendarSalvamento(); }
+
+    function classeDoVeredito(id) {
+      const v = vereditos.value[id]?.veredito;
+      return v === 'CORTAR' ? 'cortado' : v === 'MANTER' ? 'mantido' : v === 'REESCREVER' ? 'reescrito' : '';
+    }
+
+    // o artefato e markdown: quebra simples e formatacao de fonte, nao paragrafo.
+    // deixar a prosa fluir e mais legivel do que preservar a largura do arquivo.
+    function paragrafos(texto) {
+      return texto.split(/\n{2,}/).map((p) => p.replace(/\n/g, ' ').trim()).filter(Boolean);
+    }
+
+    // blocos muito altos entram colapsados: o documento nao pode virar um rolo
+    function ehLongo(texto) {
+      return texto.split('\n').length > 9 || texto.length > 520;
+    }
+
+    function pareceCodigo(texto) {
+      return texto.includes('```') || texto.includes('| codigo |')
+        || texto.trimStart().startsWith('---') || texto.includes('- [ ]');
+    }
+
+    function liberada(chave) {
+      const i = ETAPAS.indexOf(chave);
+      if (i === 0) return true;
+      return estado.etapas[ETAPAS[i - 1]].concluida;
+    }
+
+    function irPara(chave) {
+      if (!liberada(chave)) return;
+      etapaAtual.value = chave;
+      trechoSelecionado.value = null;
+    }
+
+    function concluir() {
+      estado.etapas[etapaAtual.value].concluida = true;
+      salvar();
+      if (indiceEtapa.value < 2) {
+        etapaAtual.value = ETAPAS[indiceEtapa.value + 1];
+        trechoSelecionado.value = null;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        tela.value = 'fim';
+      }
+    }
+
+    function contagem(chave) {
+      const total = dados.variantes[estado.variante][chave].trechos.length;
+      const vs = Object.values(estado.etapas[chave].vereditos);
+      const cortes = vs.filter((v) => v.veredito === 'CORTAR').length;
+      const adds = estado.etapas[chave].adicoes.filter((a) => a.texto.trim()).length;
+      return { antes: total, depois: total - cortes + adds, cortes, adicoes: adds };
+    }
+
+    function baixar() {
+      const linhas = [`# Entrega — ${estado.nome} (${estado.matricula})`,
+        estado.dupla ? `Dupla: ${estado.dupla.nome}${estado.dupla.matricula ? ` (${estado.dupla.matricula})` : ''}` : '',
+        `Variante ${estado.variante}`, ''];
+      for (const chave of ETAPAS) {
+        linhas.push(`## ${chave}`, '');
+        const ts = dados.variantes[estado.variante][chave].trechos;
+        for (const t of ts) {
+          const v = estado.etapas[chave].vereditos[t.id];
+          if (!v?.veredito) continue;
+          linhas.push(`### Trecho ${String(t.numero).padStart(2, '0')} — ${v.veredito}`);
+          linhas.push(`> ${t.texto.split('\n').join('\n> ')}`, '');
+          linhas.push(`Categoria: ${v.categoria || '—'}`);
+          linhas.push(`Justificativa: ${v.justificativa || '—'}`, '');
+        }
+        linhas.push('#### Acréscimos', '');
+        for (const a of estado.etapas[chave].adicoes) {
+          if (!a.texto.trim()) continue;
+          linhas.push(`- ${a.texto}`, `  - por quê: ${a.justificativa}`, '');
+        }
+        if (chave === 'skill' && estado.gatilho) {
+          linhas.push('#### Gatilho reescrito', '', estado.gatilho, '');
+        }
+      }
+      const blob = new Blob([linhas.join('\n')], { type: 'text/markdown' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `entrega-${estado.matricula || estado.chave}.md`;
+      a.click();
+    }
+
+    return {
+      MIN_VEREDITOS, MIN_ADICOES,
+      ROTULOS: { prompt: '1. Prompt', agents: '2. AGENTS.md', skill: '3. Skill' },
+      TITULOS: {
+        prompt: 'O prompt da tarefa',
+        agents: 'O AGENTS.md do projeto',
+        skill: 'A skill de recurso novo'
+      },
+      INSTRUCOES: {
+        prompt: 'Foi assim que o pedido chegou. Julgue cada trecho e depois escreva o que faltou.',
+        agents: 'Este arquivo é lido em toda requisição. Cada linha inútil é paga sempre.',
+        skill: 'Carregada sob demanda — mas só se o gatilho disser quando.'
+      },
+      CATEGORIAS: [
+        'o agente descobre isso sozinho',
+        'não muda comportamento nenhum',
+        'é contexto de humano, não de agente',
+        'está duplicado',
+        'está desatualizado',
+        'não se aplica a este projeto',
+        'não dá para verificar se foi cumprido',
+        'é regra de verdade'
+      ],
+      estatico, ONDE_SALVA,
+      tela, entradaMatricula, entradaDupla, candidato, erroEntrada, aluno, dupla, online,
+      estado, variante, etapaAtual, indiceEtapa, trechos, vereditos, adicoes,
+      trechoSelecionado, numeroSelecionado, vereditoAtual,
+      totalVereditos, adicoesValidas, podeConcluir,
+      expandidos, progressoEtapa, ehLongo, paragrafos,
+      MARCAS: { CORTAR: '×', MANTER: '●', REESCREVER: '✎' },
+      procurar, confirmar, selecionar, definirVeredito, registrar, classeDoVeredito, pareceCodigo,
+      liberada, irPara, concluir, contagem, baixar, agendarSalvamento
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
